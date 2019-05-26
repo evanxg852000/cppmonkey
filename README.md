@@ -1,6 +1,8 @@
 # CPP Monkey:
 This is my implementation of the monkey programming language following 
-the wonderful book [Writing An Interpreter In Go](https://interpreterbook.com/). You should definetly grab a copy if you still struggle with `Operator Precedence Parsing`. Catch2 is being used for tests.
+the wonderful book <a href="https://interpreterbook.com" target="_blank">Writing An Interpreter In Go</a>. You should definetly grab a copy if you still struggle with `Operator Precedence Parsing`. Catch2 is being used for tests.
+
+[link](url){:target="_blank"}
 
 ### Try it:
 All this code is self contained as dockerized app.
@@ -26,6 +28,6 @@ $ ./entrypoint.sh frun
 The primary `raison d'etre` of this repo is to learn compilers and C++. Please help review my c++ code, suggest improvement, best practices and idoms.
 
 ### Online C++ Docs:
-https://www.learncpp.com/
-http://www.trytoprogram.com/c-programming
-http://www.fredosaurus.com/notes-cpp/index.html
+- https://www.learncpp.com/
+- http://www.trytoprogram.com/c-programming
+- http://www.fredosaurus.com/notes-cpp/index.html
