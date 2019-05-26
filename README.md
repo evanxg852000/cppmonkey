@@ -2,8 +2,6 @@
 This is my implementation of the monkey programming language following 
 the wonderful book <a href="https://interpreterbook.com" target="_blank">Writing An Interpreter In Go</a>. You should definetly grab a copy if you still struggle with `Operator Precedence Parsing`. Catch2 is being used for tests.
 
-[link](url){:target="_blank"}
-
 ### Try it:
 All this code is self contained as dockerized app.
 
