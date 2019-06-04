@@ -50,14 +50,11 @@ if (5 < 10) {
 
 10 == 10;
 10 != 9;
-)STRING";
-
-/*
-"foobar"
-"foo bar"
+"foobar";
+"foo bar";
 [1, 2];
-{"foo": "bar"}
-*/
+{"foo": "bar"};
+)STRING";
 
     Token tokens[] = {
         makeToken(TokenType::LET, "let"),
@@ -136,6 +133,25 @@ if (5 < 10) {
         makeToken(TokenType::NUMBER, "10"),
         makeToken(TokenType::BANG_EQUAL, "!="),
         makeToken(TokenType::NUMBER, "9"),
+        makeToken(TokenType::SEMICOLON, ";"),
+
+        makeToken(TokenType::STRING, "foobar"),
+        makeToken(TokenType::SEMICOLON, ";"),
+        makeToken(TokenType::STRING, "foo bar"),
+        makeToken(TokenType::SEMICOLON, ";"),
+
+        makeToken(TokenType::LEFT_BRACKET, "["),
+        makeToken(TokenType::NUMBER, "1"),
+        makeToken(TokenType::COMMA, ","),
+        makeToken(TokenType::NUMBER, "2"),
+        makeToken(TokenType::RIGHT_BRACKET, "]"),
+        makeToken(TokenType::SEMICOLON, ";"),
+
+        makeToken(TokenType::LEFT_BRACE, "{"),
+        makeToken(TokenType::STRING, "foo"),
+        makeToken(TokenType::COLON, ":"),
+        makeToken(TokenType::STRING, "bar"),
+        makeToken(TokenType::RIGHT_BRACE, "}"),
         makeToken(TokenType::SEMICOLON, ";"),
 
         makeToken(TokenType::EOS, ""),

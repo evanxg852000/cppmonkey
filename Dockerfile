@@ -12,6 +12,8 @@ RUN apt-get -qq install libboost-all-dev=1.62.0.1
 RUN apt-get -qq install build-essential libtcmalloc-minimal4 && \
   ln -s /usr/lib/libtcmalloc_minimal.so.4 /usr/lib/libtcmalloc_minimal.so
 
+RUN apt-get -qqy install gdb vim
+
 COPY . /usr/project
 WORKDIR /usr/project/build
 

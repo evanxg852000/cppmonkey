@@ -14,6 +14,10 @@ std::string to_string(const TokenType& type){
         return "LEFT_PAREN";
     case TokenType::RIGHT_PAREN:
         return "RIGHT_PAREN"; 
+    case TokenType::LEFT_BRACKET:
+        return "LEFT_BRACKET";
+    case TokenType::RIGHT_BRACKET:
+        return "RIGHT_BRACKET";
     case TokenType::LEFT_BRACE:
         return "LEFT_BRACE"; 
     case TokenType::RIGHT_BRACE:
@@ -26,6 +30,8 @@ std::string to_string(const TokenType& type){
         return "MINUS"; 
     case TokenType::PLUS:
         return "PLUS"; 
+    case TokenType::COLON:
+        return "COLON";
     case TokenType::SEMICOLON:
         return "SEMICOLON"; 
     case TokenType::SLASH:

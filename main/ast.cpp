@@ -86,6 +86,16 @@ string NumberLiteral::toString(){
     return tokenLiteral();
 }
 
+// StringLiteral class
+void StringLiteral::expressionNode(){
+
+}
+
+string StringLiteral::toString(){
+    return tokenLiteral();
+}
+
+
 // BooleanLiteral class
 void BooleanLiteral::expressionNode(){
 
@@ -93,8 +103,49 @@ void BooleanLiteral::expressionNode(){
 string BooleanLiteral::toString(){
     /* Note: 
        std::to_string(value) should be used, boolean is converted to int in c++
+       maybe write a template specialization
     */
     return tokenLiteral();
+}
+
+// ArrayLiteral 
+void ArrayLiteral::expressionNode(){
+
+}
+string ArrayLiteral::toString(){
+    stringstream ss;
+    ss << "[";
+    bool isFirst= true;
+    for(auto item: items){
+        if(isFirst)
+            isFirst = false;
+        else
+            ss << ", ";
+
+        ss << item->toString();
+    }
+    ss << "]";
+    return ss.str();
+}
+
+// HashLiteral
+void HashLiteral::expressionNode(){
+
+}
+string HashLiteral::toString(){
+    stringstream ss;
+    ss << "{";
+    bool isFirst= true;
+    for(auto entry: entries){
+        if(isFirst) 
+            isFirst = false; 
+        else 
+            ss << ", ";
+    
+        ss << entry.first->toString() << ":" << entry.second->toString();
+    }
+    ss << "}";
+    return ss.str();
 }
 
 // PrefixExpression class
@@ -157,5 +208,15 @@ string CallExpression::toString(){
             ss << ", ";
     }
     ss << ")";
+    return ss.str();
+}
+
+// IndexExpression class
+void IndexExpression::expressionNode(){
+
+}
+string IndexExpression::toString(){
+    stringstream ss;
+    ss << "(" << left->toString() << "[" << index->toString() << "])";
     return ss.str();
 }

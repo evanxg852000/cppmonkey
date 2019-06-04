@@ -21,6 +21,7 @@ enum class PrecedenceLevel {
     PRODUCT,     // * or /
     PREFIX,      // -x or !x
     CALL,        // myFunc(x)
+    INDEX,       // index
 };
 
 class Parser {
@@ -59,13 +60,17 @@ private:
     //pratt functions
     std::shared_ptr<ExpressionNode> parseIdentifier();
     std::shared_ptr<ExpressionNode> parseNumberLiteral();
+    std::shared_ptr<ExpressionNode> parseStringLiteral();
     std::shared_ptr<ExpressionNode> parseBooleanLiteral();
+    std::shared_ptr<ExpressionNode> parseArrayLiteral();
+    std::shared_ptr<ExpressionNode> parseHashLiteral();
     std::shared_ptr<ExpressionNode> parsePrefixExpression();
     std::shared_ptr<ExpressionNode> parseInfixExpression(std::shared_ptr<ExpressionNode>);
     std::shared_ptr<ExpressionNode> parseGroupedExpression();
     std::shared_ptr<ExpressionNode> parseIfExpression();
     std::shared_ptr<ExpressionNode> parseFunctionLiteral();
     std::shared_ptr<ExpressionNode> parseCallExpression(std::shared_ptr<ExpressionNode>);
+    std::shared_ptr<ExpressionNode> parseIndexExpression(std::shared_ptr<ExpressionNode>);
 
     void registerPrefix(TokenType, PrefixParseFn);
     void registerInfix(TokenType, InfixParseFn);

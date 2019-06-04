@@ -36,4 +36,6 @@ std::string format(T v1, Types... v2) {
     return ss.str();
 } 
 
+void _d(std::string);
+
 #endif //  UTILS_H

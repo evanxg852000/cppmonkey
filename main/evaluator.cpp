@@ -16,6 +16,78 @@
 
 using namespace std;
 
+Evaluator::Evaluator(std::shared_ptr<Program> ast): program{ast}, builtins{} {
+    builtins["PI"] = Object(ObjectType::BUILTIN_OBJECT, Object{ObjectType::NUMBER, 3.14});
+    
+    builtins["len"] = Object{ObjectType::BUILTIN_FUNCTION, Object::BuiltInFunction {
+            [this](vector<Object> args) -> Object {
+                if(args.size() != 1)
+                    return raiseError(format("wrong number of argument. got=", args.size(), ", want=1"));
+                switch (args[0].type){
+                case ObjectType::ARRAY:
+                    return Object{ObjectType::NUMBER, (double)(any_cast<vector<Object>>(args[0].value).size())};
+                case ObjectType::STRING:
+                    return Object{ObjectType::NUMBER, (double)(any_cast<string>(args[0].value).size())};
+                default:
+                    return raiseError(format("argument to len not supported, got ", args[0].getType()));
+                }
+            }
+        }};
+    builtins["first"] = Object{ObjectType::BUILTIN_FUNCTION, Object::BuiltInFunction {
+            [this](vector<Object> args) -> Object {
+                if(args.size() != 1)
+                    return raiseError(format("wrong number of argument. got=", args.size(), ", want=1"));
+                
+                if(args[0].type != ObjectType::ARRAY)
+                    return raiseError(format("argument to first must be ARRAY, got ", args[0].getType()));
+                
+                auto arr = any_cast<vector<Object>>(args[0].value);
+                if(arr.size() > 0) 
+                    return arr[0];
+
+                return NIL_OBJ;
+            }
+        }};
+    builtins["last"] = Object{ObjectType::BUILTIN_FUNCTION, Object::BuiltInFunction {
+            [this](vector<Object> args) -> Object {
+                if(args.size() != 1)
+                    return raiseError(format("wrong number of argument. got=", args.size(), ", want=1"));
+                
+                if(args[0].type != ObjectType::ARRAY)
+                    return raiseError(format("argument to first must be ARRAY, got ", args[0].getType()));
+                
+                auto arr = any_cast<vector<Object>>(args[0].value);
+                int size = arr.size();
+                if(size > 0) 
+                    return arr[size - 1];
+                    
+                return NIL_OBJ;
+            }
+        }};
+    builtins["push"] = Object{ObjectType::BUILTIN_FUNCTION, Object::BuiltInFunction {
+            [this](vector<Object> args) -> Object {
+                if(args.size() != 2)
+                    return raiseError(format("wrong number of argument. got=", args.size(), ", want=2"));
+                
+                if(args[0].type != ObjectType::ARRAY)
+                    return raiseError(format("argument to first must be ARRAY, got ", args[0].getType()));
+                
+                auto arr = any_cast<vector<Object>>(args[0].value);
+                arr.push_back(args[1]);
+
+                return Object{ObjectType::ARRAY, arr};
+            }
+        }};
+
+    builtins["print"] = Object{ObjectType::BUILTIN_FUNCTION, Object::BuiltInFunction {
+            [this](vector<Object> args) -> Object {
+                for(auto itm: args)
+                    cout << itm.inspect() << endl;
+                return NIL_OBJ;
+            }
+        }};
+    
+};
 
 Object Evaluator::eval(std::shared_ptr<AstNode> node, std::shared_ptr<Environment> env) {
     // Program
@@ -31,8 +103,11 @@ Object Evaluator::eval(std::shared_ptr<AstNode> node, std::shared_ptr<Environmen
         return evalBlockStatement(blockStmt->statements, env);
 
     // Function Literal
-    if(auto funLit = dynamic_pointer_cast<FunctionLiteral>(node); funLit != nullptr)
-        return Object{ObjectType::FUNCTION, FunctionObject{funLit, env}};
+    if(auto funLit = dynamic_pointer_cast<FunctionLiteral>(node); funLit != nullptr){
+        auto obj = Object{ObjectType::FUNCTION, FunctionObject{funLit, env}};
+        obj._tag = funLit->tokenLiteral();
+        return obj;
+    }
 
     // Call
     if(auto callExpr = dynamic_pointer_cast<CallExpression>(node); callExpr != nullptr){
@@ -59,9 +134,19 @@ Object Evaluator::eval(std::shared_ptr<AstNode> node, std::shared_ptr<Environmen
     // Identifier
     if(auto ident = dynamic_pointer_cast<Identifier>(node); ident != nullptr){
         auto value = env->get(ident->value);
-        if(value.type == ObjectType::UNDEFINED)
-            return raiseError(format("identifier not found: ", ident->value));
-        return value;
+        if(value.type != ObjectType::UNDEFINED)
+            return value;
+        
+        if (auto btinObj = builtins.find(ident->value); btinObj != builtins.end()){
+            auto obj = btinObj->second;
+            if(obj.type == ObjectType::BUILTIN_OBJECT){
+                auto val = any_cast<double>(any_cast<Object>(obj.value).value);
+                return any_cast<Object>(obj.value);
+            }
+            return obj; // BUILTIN_FUNCTIOMN
+        }
+        
+        return raiseError(format("identifier not found: ", ident->value));
     }
 
     // If Else
@@ -79,6 +164,10 @@ Object Evaluator::eval(std::shared_ptr<AstNode> node, std::shared_ptr<Environmen
     // Number
     if(auto number = dynamic_pointer_cast<NumberLiteral>(node); number != nullptr)
         return Object{ObjectType::NUMBER, number->value};
+
+    // String 
+    if(auto str = dynamic_pointer_cast<StringLiteral>(node); str != nullptr)
+        return Object{ObjectType::STRING, str->value};
 
     // Boolean
     if(auto boolean = dynamic_pointer_cast<BooleanLiteral>(node); boolean != nullptr)
@@ -103,9 +192,48 @@ Object Evaluator::eval(std::shared_ptr<AstNode> node, std::shared_ptr<Environmen
         return evalInfixExpression(infixExpr->oprator, left, right);
     }
 
+    // Array
+    if(auto arrExpr = dynamic_pointer_cast<ArrayLiteral>(node); arrExpr != nullptr){
+        auto items  = make_shared<std::vector<std::shared_ptr<ExpressionNode>>>(arrExpr->items);
+        auto objects = evalExpressions(items, env);
 
-    
-    
+        if(objects.size() == 1 && objects[0].type == ObjectType::ERROR)
+            return objects[0];
+
+        return Object{ObjectType::ARRAY, objects};
+    }
+
+    // Hash
+    if(auto hashExpr = dynamic_pointer_cast<HashLiteral>(node); hashExpr != nullptr){
+        auto entries = unordered_map<string, std::pair<Object, Object>>{};
+        for(auto entry: hashExpr->entries){
+            auto key = eval(entry.first, env);
+            if(key.type == ObjectType::ERROR)
+                return key;
+
+            if(key.type != ObjectType::NUMBER && key.type != ObjectType::STRING && key.type != ObjectType::BOOLEAN)
+                return raiseError(format("unusable as hash key: ", key.getType()));
+        
+            auto value = eval(entry.second, env);
+            if(value.type == ObjectType::ERROR)
+                return value;
+            
+            entries[key.hashKey()] = std::make_pair(key, value);
+        }
+        return Object{ObjectType::HASH, entries};
+    }
+
+    // Index
+    if(auto idxExpr = dynamic_pointer_cast<IndexExpression>(node); idxExpr != nullptr) {
+        auto left = eval(idxExpr->left, env);
+        if(left.type == ObjectType::ERROR)
+            return left;
+        auto idx = eval(idxExpr->index, env);
+        if(idx.type == ObjectType::ERROR)
+            return idx;
+        return evalIndexExpression(left, idx);
+    }
+
     return NIL_OBJ;
 }
 
@@ -148,8 +276,8 @@ Object Evaluator::evalInfixExpression(std::string oprator, Object left, Object r
     if(left.type == ObjectType::NUMBER && right.type == ObjectType::NUMBER)
         return evalIntegerInfixExpression(oprator, left, right); 
     
-
-
+    if(left.type == ObjectType::STRING && right.type == ObjectType::STRING)
+        return evalStringInfixExpression(oprator, left, right);
 
     // std::addressof(left) cannot work as these values are passed by value
     // therefore copied around
@@ -260,22 +388,63 @@ Object Evaluator::evalIntegerInfixExpression(std::string oprator, Object left, O
     return raiseError(format("unknown operator: ", left.getType(), " ", oprator, " ", right.getType()));
 }
 
-Object Evaluator::applyFunction(Object func, std::vector<Object> args){
-    if(func.type != ObjectType::FUNCTION)
-        return raiseError(format("not a function ", func.getType()));
+Object Evaluator::evalStringInfixExpression(std::string oprator, Object left, Object right) {
+    if(oprator != "+")
+        return raiseError(format("unknown operator: ", left.getType(), " ", oprator, " ", right.getType()));
     
-    // create new env & bind params values
-    auto funcObject = any_cast<FunctionObject>(func.value);
-    auto env = std::make_shared<Environment>(funcObject.env);
-    int i = 0;
-    for(auto param: *funcObject.func->params){
-        env->set(param.value, args[i++]);
+    auto leftStr = any_cast<string>(left.value);
+    auto rightStr = any_cast<string>(right.value);
+    return Object{ObjectType::STRING, (leftStr + rightStr)};
+}
+
+Object Evaluator::evalIndexExpression(Object left, Object idx){
+    if(left.type == ObjectType::ARRAY && idx.type == ObjectType::NUMBER){
+        auto arrayObj = any_cast<vector<Object>>(left.value);
+        auto  i = (int) any_cast<double>(idx.value);
+        if(i < 0 || i >= arrayObj.size()){
+            return NIL_OBJ;
+        }
+        return arrayObj[i];
     }
 
-    auto value = eval(funcObject.func->body, env);
-    if(value.type == ObjectType::RETURN)
-        return any_cast<Object>(value);
-    return value;
+    if(left.type == ObjectType::HASH){
+        auto hashObj = any_cast<unordered_map<string, pair<Object, Object>>>(left.value);
+
+        if(idx.type != ObjectType::NUMBER && idx.type != ObjectType::STRING && idx.type != ObjectType::BOOLEAN)
+            return raiseError(format("unusable as hash key: ", idx.getType()));
+        
+        if(hashObj.find(idx.hashKey()) == hashObj.end())
+            return NIL_OBJ;
+
+        return hashObj[idx.hashKey()].second;
+    }
+
+    return raiseError(format("index operator not supported: ", left.getType()));
+}
+
+Object Evaluator::applyFunction(Object func, std::vector<Object> args){
+    if(func.type == ObjectType::FUNCTION) {
+        // create new env & bind params values
+        auto funcObject = any_cast<FunctionObject>(func.value);
+        auto env = std::make_shared<Environment>(funcObject.env);
+        int i = 0;
+        for(auto param: *funcObject.func->params){
+            env->set(param.value, args[i++]);
+        }
+
+        auto value = eval(funcObject.func->body, env);
+        if(value.type == ObjectType::RETURN)
+            return any_cast<Object>(value);
+        return value;
+    } 
+
+    if(func.type == ObjectType::BUILTIN_FUNCTION){
+        auto funcLamda = any_cast<Object::BuiltInFunction>(func.value);
+        auto t = funcLamda(args);
+        return funcLamda(args);
+    }
+    
+    return raiseError(format("not a function ", func.getType()));  
 }
 
 Object Evaluator::raiseError(std::string msg) {

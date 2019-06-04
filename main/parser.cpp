@@ -26,15 +26,19 @@ Parser::Parser(Lexer& lexer): lexer{lexer} {
         {TokenType::MINUS, static_cast<int>(PrecedenceLevel::SUM)},
         {TokenType::STAR, static_cast<int>(PrecedenceLevel::PRODUCT)},
         {TokenType::SLASH, static_cast<int>(PrecedenceLevel::PRODUCT)},
-        {TokenType::LEFT_PAREN, static_cast<int>(PrecedenceLevel::CALL)}
+        {TokenType::LEFT_PAREN, static_cast<int>(PrecedenceLevel::CALL)},
+        {TokenType::LEFT_BRACKET, static_cast<int>(PrecedenceLevel::INDEX)}
     };
 
     //register prefix functions 
     registerPrefix(TokenType::IDENT, std::bind(&Parser::parseIdentifier, this));
     registerPrefix(TokenType::NUMBER, std::bind(&Parser::parseNumberLiteral, this));
+    registerPrefix(TokenType::STRING, std::bind(&Parser::parseStringLiteral, this));
     registerPrefix(TokenType::BANG, std::bind(&Parser::parsePrefixExpression, this));
     registerPrefix(TokenType::MINUS, std::bind(&Parser::parsePrefixExpression, this));
     registerPrefix(TokenType::TRUE, std::bind(&Parser::parseBooleanLiteral, this));
+    registerPrefix(TokenType::LEFT_BRACKET, std::bind(&Parser::parseArrayLiteral, this));
+    registerPrefix(TokenType::LEFT_BRACE, std::bind(&Parser::parseHashLiteral, this));
     registerPrefix(TokenType::FALSE, std::bind(&Parser::parseBooleanLiteral, this));
     registerPrefix(TokenType::LEFT_PAREN, std::bind(&Parser::parseGroupedExpression, this));
     registerPrefix(TokenType::IF, std::bind(&Parser::parseIfExpression, this));
@@ -50,6 +54,7 @@ Parser::Parser(Lexer& lexer): lexer{lexer} {
     registerInfix(TokenType::LESS, std::bind(&Parser::parseInfixExpression, this, std::placeholders::_1));
     registerInfix(TokenType::GREATER, std::bind(&Parser::parseInfixExpression, this, std::placeholders::_1));
     registerInfix(TokenType::LEFT_PAREN, std::bind(&Parser::parseCallExpression, this, std::placeholders::_1));
+    registerInfix(TokenType::LEFT_BRACKET, std::bind(&Parser::parseIndexExpression, this, std::placeholders::_1));
 }
 
 void Parser::nextToken(){
@@ -91,8 +96,9 @@ shared_ptr<LetStatement> Parser::parseLetStatement(){
     nextToken();
     stmt.value = parseExpression(static_cast<int>(PrecedenceLevel::LOWEST));
 
-    while(!currentTokenIs(TokenType::SEMICOLON))
+    while(!currentTokenIs(TokenType::SEMICOLON) && !currentTokenIs(TokenType::EOS))
         nextToken();
+
     return make_shared<LetStatement>(stmt);
 }
 
@@ -205,8 +211,56 @@ shared_ptr<ExpressionNode> Parser::parseNumberLiteral(){
     return make_shared<NumberLiteral>(currToken, std::get<double>(currToken.value));
 }
 
+shared_ptr<ExpressionNode> Parser::parseStringLiteral(){
+    return make_shared<StringLiteral>(currToken, std::get<string>(currToken.value));
+}
+
 shared_ptr<ExpressionNode> Parser::parseBooleanLiteral(){
     return make_shared<BooleanLiteral>(currToken, std::get<bool>(currToken.value));
+}
+
+shared_ptr<ExpressionNode> Parser::parseArrayLiteral(){
+    auto arrayExpr = ArrayLiteral{currToken};
+    if(peekTokenIs(TokenType::RIGHT_BRACKET)){
+        nextToken();
+        return make_shared<ArrayLiteral>(arrayExpr);
+    }
+
+    nextToken();
+    arrayExpr.items.push_back(parseExpression(static_cast<int>(PrecedenceLevel::LOWEST)));
+    while(peekTokenIs(TokenType::COMMA)){
+        nextToken();
+        nextToken();
+        arrayExpr.items.push_back(parseExpression(static_cast<int>(PrecedenceLevel::LOWEST)));
+    }
+
+    if(!expectPeek(TokenType::RIGHT_BRACKET))
+        return nullptr;
+    
+    return make_shared<ArrayLiteral>(arrayExpr);
+}
+
+shared_ptr<ExpressionNode> Parser::parseHashLiteral(){
+    auto hashExpr = HashLiteral{currToken};
+    while(!peekTokenIs(TokenType::RIGHT_BRACE)){
+        nextToken();
+        auto key = parseExpression(static_cast<int>(PrecedenceLevel::LOWEST));
+        if(!expectPeek(TokenType::COLON))
+            return nullptr;
+
+        nextToken();
+        auto value = parseExpression(static_cast<int>(PrecedenceLevel::LOWEST));
+
+        hashExpr.entries[key] = value;
+
+        if(!peekTokenIs(TokenType::RIGHT_BRACE) && !expectPeek(TokenType::COMMA))
+            return nullptr;
+    }
+
+    if(!expectPeek(TokenType::RIGHT_BRACE))
+        return nullptr;
+    
+    return make_shared<HashLiteral>(hashExpr);
 }
 
 shared_ptr<ExpressionNode> Parser::parsePrefixExpression(){
@@ -277,6 +331,17 @@ shared_ptr<ExpressionNode> Parser::parseCallExpression(shared_ptr<ExpressionNode
     auto expr = CallExpression{currToken, func};
     expr.arguments = parseCallArguments();
     return make_shared<CallExpression>(expr);
+}
+
+shared_ptr<ExpressionNode> Parser::parseIndexExpression(shared_ptr<ExpressionNode> left){
+    auto expr = IndexExpression{currToken, left};
+    nextToken();
+    expr.index = parseExpression(static_cast<int>(PrecedenceLevel::LOWEST));
+
+    if(!expectPeek(TokenType::RIGHT_BRACKET))
+        return nullptr;
+
+    return make_shared<IndexExpression>(expr);
 }
 
 // helpers

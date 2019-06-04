@@ -13,7 +13,7 @@
 
 class Evaluator {
 public:
-    Evaluator(std::shared_ptr<Program> ast): program{ast} {};
+    Evaluator(std::shared_ptr<Program>);
     virtual ~Evaluator() = default;
     Object execute(std::shared_ptr<Environment> env){ return eval(this->program, env); }
     
@@ -23,6 +23,7 @@ private:
     const Object FALSE_OBJ = Object{ObjectType::BOOLEAN, false};
 
     std::shared_ptr<Program> program;
+    std::unordered_map<std::string, Object> builtins;
 
     Object eval(std::shared_ptr<AstNode>, std::shared_ptr<Environment>);
     Object evalProgram(std::vector<std::shared_ptr<StatementNode>>, std::shared_ptr<Environment>);
@@ -37,6 +38,8 @@ private:
     Object nativeToBoolean(bool);
     Object evalMinusOperatorExpression(Object);
     Object evalIntegerInfixExpression(std::string, Object, Object);
+    Object evalStringInfixExpression(std::string, Object, Object);
+    Object evalIndexExpression(Object, Object);
     Object applyFunction(Object, std::vector<Object>);
     Object raiseError(std::string);
     bool isTruthy(Object);

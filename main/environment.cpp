@@ -6,7 +6,7 @@
 using namespace std;
 
 Object Environment::set(string name, Object value) {
-    store.insert(make_pair(name, value));
+    store[name]= value;
     return value; 
 }
 

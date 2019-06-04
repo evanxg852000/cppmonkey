@@ -26,6 +26,16 @@ Token Lexer::nextToken(){
     Token token;
     skipWhitespace();
     switch (ch){
+        case '"':{
+            string str{};
+            do {
+                readChar();
+                if(ch != '"') 
+                   str.push_back(ch);
+            } while (ch != '"');
+            token = makeToken(TokenType::STRING, str); 
+            break;
+            }
         case '=':
             if(peekChar() == '='){
                 string str{ch};
@@ -64,6 +74,9 @@ Token Lexer::nextToken(){
         case '>':
             token = makeToken(TokenType::GREATER, ch);
             break;
+        case ':':
+            token = makeToken(TokenType::COLON, ch);
+            break;
         case ';':
             token = makeToken(TokenType::SEMICOLON, ch);
             break;
@@ -75,6 +88,12 @@ Token Lexer::nextToken(){
             break;
         case ')':
             token = makeToken(TokenType::RIGHT_PAREN, ch);
+            break;
+        case '[':
+            token = makeToken(TokenType::LEFT_BRACKET, ch);
+            break;
+        case ']':
+            token = makeToken(TokenType::RIGHT_BRACKET, ch);
             break;
         case '{':
             token = makeToken(TokenType::LEFT_BRACE, ch);

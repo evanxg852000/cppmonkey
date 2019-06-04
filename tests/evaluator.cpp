@@ -1,6 +1,7 @@
 #include <iostream>
 #include <array>
 #include <tuple>
+#include <any>
 
 
 
@@ -30,9 +31,13 @@ Object testEval(string input){
         return evaluator.execute(env);
 }
 
+string hashKeyOf(ObjectType t, std::any v){
+    return Object{t, v}.hashKey();
+}
+
 TEST_CASE("Test Eval Integer Literal", "[evaluator]"){
     using TestItem = std::pair<string, double>;
-     std::array<TestItem, 15> tests{ {
+    std::array<TestItem, 15> tests{ {
         make_pair("5;", 5), 
         make_pair("10", 10),
         make_pair("-5;", -5), 
@@ -57,6 +62,25 @@ TEST_CASE("Test Eval Integer Literal", "[evaluator]"){
         REQUIRE(any_cast<double>(evaluated.value ) == test.second);
     }
 
+}
+
+TEST_CASE("Test String", "[evaluator]"){
+    using TestItem = std::pair<string, string>;
+    std::array<TestItem, 2> tests{ {
+        make_pair(" \"Hello World!\" ", "Hello World!"),
+        make_pair(" \"Hello\" + \" \" + \"World!\" ", "Hello World!"), 
+    }};
+
+    for(auto test : tests){
+        Object evaluated = testEval(test.first);
+        REQUIRE(evaluated.type == ObjectType::STRING);
+        REQUIRE(any_cast<string>(evaluated.value ) == test.second);
+    }
+
+    const char* input = R"STRING( "Hello World!" )STRING";
+    Object evaluated = testEval(string{input});
+    REQUIRE(evaluated.type == ObjectType::STRING);
+    REQUIRE(any_cast<string>(evaluated.value) == "Hello World!");
 }
 
 TEST_CASE("Test Eval Boolean Literal", "[evaluator]"){
@@ -152,7 +176,7 @@ TEST_CASE("Test Return Statement", "[evaluator]"){
 
 TEST_CASE("Test Error Handling", "[evaluator]"){
     using TestItem = std::pair<string, std::string>;
-     std::array<TestItem, 8> tests{ {
+     std::array<TestItem, 11> tests{ {
         make_pair("5 + true;", "type mismatch: NUMBER + BOOLEAN"),
 		make_pair("5 + true; 5;", "type mismatch: NUMBER + BOOLEAN"),
 		make_pair("-true", "unknown operator: -BOOLEAN"),
@@ -160,9 +184,10 @@ TEST_CASE("Test Error Handling", "[evaluator]"){
 		make_pair("5; true + false; 5", "unknown operator: BOOLEAN + BOOLEAN"),
 		make_pair("if (10 > 1) { true + false; }", "unknown operator: BOOLEAN + BOOLEAN"),
 		make_pair("if (10 > 1) { if (10 > 1) { return true + false; } return 1;}", "unknown operator: BOOLEAN + BOOLEAN"),
-        make_pair("foobar", "identifier not found: foobar")
-        //make_pair("true + false + true + false;", "unknown operator: BOOLEAN + BOOLEAN"),
-        //make_pair(" \"Hello\" - \"World\" ", "unknown operator: STRING - STRING"),
+        make_pair("foobar", "identifier not found: foobar"),
+        make_pair("true + false + true + false;", "unknown operator: BOOLEAN + BOOLEAN"),
+        make_pair(" \"Hello\" - \"World\" ", "unknown operator: STRING - STRING"),
+        make_pair(R"STRING({"name": "Monkey"}[fn(x) { x }];)STRING", "unusable as hash key: FUNCTION")
     }};
 
     for(auto test : tests){
@@ -231,4 +256,130 @@ addTwo(2);
     Object evaluated = testEval(string{input});
     REQUIRE(evaluated.type == ObjectType::NUMBER);
     REQUIRE(any_cast<double>(evaluated.value) == 4);
+}
+
+TEST_CASE("Test Builtins ", "[evaluator]"){
+    using TestItem = std::pair<string, double>;
+    std::array<TestItem, 5> tests{ {
+        make_pair("PI;", 3.14),
+		make_pair("PI + 10;", 13.14),
+		make_pair("len(\"\");", 0),
+        make_pair("len(\"four\");", 4),
+        make_pair("len([2, 3 + 4])", 2),
+    }};
+
+    for(auto test : tests){
+        Object evaluated = testEval(test.first);
+        REQUIRE(evaluated.type == ObjectType::NUMBER);
+        REQUIRE(any_cast<double>(evaluated.value) == test.second);
+    }
+
+    using TestItemError = std::pair<string, string>;
+    std::array<TestItemError, 2> errotTests{ {
+        make_pair("len(1);", "argument to len not supported, got NUMBER"),
+        make_pair("len(\"one\", \"two\"); ", "wrong number of argument. got=2, want=1")
+    }};
+    for(auto test : errotTests){
+        Object evaluated = testEval(test.first);
+        REQUIRE(evaluated.type == ObjectType::ERROR);
+        REQUIRE(any_cast<string>(evaluated.value) == test.second);
+    }   
+}
+
+TEST_CASE("Test Array Literal Evaluation", "[evaluator]"){
+    Object evaluated = testEval("[ 1, 2 * 2, 3 + 3 ]");
+    REQUIRE(evaluated.type == ObjectType::ARRAY);
+    auto items = any_cast<vector<Object>>(evaluated.value);
+    REQUIRE(items.size() == 3);
+
+    REQUIRE(items[0].type == ObjectType::NUMBER);
+    REQUIRE(any_cast<double>(items[0].value) == 1);
+    REQUIRE(items[1].type == ObjectType::NUMBER);
+    REQUIRE(any_cast<double>(items[1].value) == 4);
+    REQUIRE(items[2].type == ObjectType::NUMBER);
+    REQUIRE(any_cast<double>(items[2].value) == 6);
+}
+
+TEST_CASE("Test Array Index Expression Evaluation", "[evaluator]"){
+    using TestItem = std::pair<string, Object>;
+    std::array<TestItem, 10> tests{ {
+        make_pair("[1, 2, 3][0]", Object{ObjectType::NUMBER, 1.0}),
+		make_pair("[1, 2, 3][1]", Object{ObjectType::NUMBER, 2.0}),
+		make_pair("[1, 2, 3][2]", Object{ObjectType::NUMBER, 3.0}),
+		make_pair("let i = 0; [1][i];", Object{ObjectType::NUMBER, 1.0}),
+		make_pair("[1, 2, 3][1 + 1];", Object{ObjectType::NUMBER, 3.0}),
+		make_pair("let myArray = [1, 2, 3]; myArray[2];", Object{ObjectType::NUMBER, 3.0}),
+		make_pair( "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];", Object{ObjectType::NUMBER, 6.0}),
+		make_pair( "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i];", Object{ObjectType::NUMBER, 2.0}),
+		make_pair("[1, 2, 3][3]", Object{ObjectType::NIL, 0.0}),
+		make_pair("[1, 2, 3][-1]", Object{ObjectType::NIL, 0.0})
+    }};
+
+    for(auto test : tests){
+        Object evaluated = testEval(test.first);
+        REQUIRE(evaluated.type == test.second.type);
+        REQUIRE(any_cast<double>(evaluated.value) == any_cast<double>(test.second.value));
+    }
+
+}
+
+
+TEST_CASE("Test Hash Literal Evaluation", "[evaluator]"){
+    const char* input = R"STRING(
+let two = "two";
+{
+    "one": 10 - 9,
+    two: 1 + 1,
+    "thr" + "ee": 6 / 2,
+    4: 4,
+    true: 5,
+    false: 6
+};
+)STRING";
+
+    Object evaluated = testEval(string{input});
+    REQUIRE(evaluated.type == ObjectType::HASH);
+    auto entries = any_cast<unordered_map<string, pair<Object, Object>>>(evaluated.value);
+    REQUIRE(entries.size() == 6);
+
+    auto key = hashKeyOf(ObjectType::STRING, string{"one"});
+    REQUIRE(entries[key].second.type == ObjectType::NUMBER);
+    REQUIRE(any_cast<double>(entries[key].second.value) == 1);
+
+    key = hashKeyOf(ObjectType::STRING, string{"two"});
+    REQUIRE(entries[key].second.type == ObjectType::NUMBER);
+    REQUIRE(any_cast<double>(entries[key].second.value) == 2);
+
+    key = hashKeyOf(ObjectType::STRING, string{"three"});
+    REQUIRE(entries[key].second.type == ObjectType::NUMBER);
+    REQUIRE(any_cast<double>(entries[key].second.value) == 3);
+
+    key = hashKeyOf(ObjectType::NUMBER, 4.0);
+    REQUIRE(entries[key].second.type == ObjectType::NUMBER);
+    REQUIRE(any_cast<double>(entries[key].second.value) == 4);
+
+    key = hashKeyOf(ObjectType::BOOLEAN, true);
+    REQUIRE(entries[key].second.type == ObjectType::NUMBER);
+    REQUIRE(any_cast<double>(entries[key].second.value) == 5);
+}
+
+
+TEST_CASE("Test Hash Index Expression Evaluation", "[evaluator]"){
+    using TestItem = std::pair<const char*, Object>;
+    std::array<TestItem, 7> tests{ {
+        make_pair(R"STRING({"foo": 5}["foo"])STRING", Object{ObjectType::NUMBER, 5.0}),
+	    make_pair(R"STRING({"foo": 5}["bar"])STRING", Object{ObjectType::NIL, 0.0}),
+        make_pair(R"STRING(let key = "foo"; {"foo": 5}[key])STRING", Object{ObjectType::NUMBER, 5.0}),
+        make_pair(R"STRING({}["foo"])STRING", Object{ObjectType::NIL, 0.0}),
+        make_pair(R"STRING({5: 5}[5])STRING", Object{ObjectType::NUMBER, 5.0}),
+        make_pair(R"STRING({true: 5}[true])STRING", Object{ObjectType::NUMBER, 5.0}),
+        make_pair(R"STRING({false: 5}[false])STRING", Object{ObjectType::NUMBER, 5.0}),
+    }};
+
+    for(auto test : tests){
+        Object evaluated = testEval(string{test.first});
+        REQUIRE(evaluated.type == test.second.type);
+        REQUIRE(any_cast<double>(evaluated.value) == any_cast<double>(test.second.value));
+    }
+	
 }

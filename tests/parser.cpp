@@ -122,6 +122,23 @@ TEST_CASE("Test NumberLiteral", "[parser]"){
     REQUIRE(number->tokenLiteral() == "5");
 }
 
+TEST_CASE("Test StringLiteral", "[parser]"){
+    const char* input = R"STRING( "Hello World!" )STRING";
+    Lexer lexer{string{input}};
+    Parser parser{lexer};
+    shared_ptr<Program> prog = parser.parseProgram();
+    checkParseError(parser);
+    
+    REQUIRE(prog != nullptr);
+    REQUIRE(prog->statements.size() == 1);
+    auto stmt = std::dynamic_pointer_cast<ExpressionStatement>(prog->statements[0]);
+    REQUIRE(stmt != nullptr);
+    REQUIRE(stmt->tokenLiteral() == "Hello World!");
+    auto str = std::dynamic_pointer_cast<StringLiteral>(stmt->expression);
+    REQUIRE(str->value == "Hello World!");
+    REQUIRE(str->tokenLiteral() == "Hello World!");
+}
+
 TEST_CASE("Test PrefixExpression", "[parser]"){
     using TestItem = std::tuple<string, string, double>;
      std::array<TestItem, 4> tests{ {
@@ -197,7 +214,7 @@ TEST_CASE("Test InfixExpression", "[parser]"){
 }
 
 TEST_CASE("Test Operator Precedence Parsing", "[parser]"){
-    std::array<std::pair<string, string>, 24> tests = {{
+    std::array<std::pair<string, string>, 26> tests = {{
         {"-a * b", "((-a) * b)"},
         {"!-a", "(!(-a))"},
         {"a + b + c", "((a + b) + c)"},
@@ -222,8 +239,8 @@ TEST_CASE("Test Operator Precedence Parsing", "[parser]"){
         {"a + add(b * c) + d", "((a + add((b * c))) + d)"},
         {"add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))", "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))"},
         {"add(a + b + c * d / f + g)", "add((((a + b) + ((c * d) / f)) + g))"},
-        // {"a * [1, 2, 3, 4][b * c] * d", "((a * ([1, 2, 3, 4][(b * c)])) * d)"},
-        // {"add(a * b[2], b[1], 2 * [1, 2][1])", "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",}
+        {"a * [1, 2, 3, 4][b * c] * d", "((a * ([1, 2, 3, 4][(b * c)])) * d)"},
+        {"add(a * b[2], b[1], 2 * [1, 2][1])", "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))"}
     }};
 
     for(auto test : tests){
@@ -399,4 +416,65 @@ using TestItem = std::tuple<string, string, int>;
         REQUIRE(call->arguments->size() == std::get<2>(test));
     }
 
+}
+
+TEST_CASE("Test Array Literal", "[parser]"){
+    Lexer lexer{"[ 1, 2 * 2, 3 + 3 ]"};
+    Parser parser{lexer};
+    shared_ptr<Program> prog = parser.parseProgram();
+    checkParseError(parser);
+
+    REQUIRE(prog != nullptr);
+    REQUIRE(prog->statements.size() == 1);  
+    auto stmt = std::dynamic_pointer_cast<ExpressionStatement>(prog->statements[0]);
+    REQUIRE(stmt != nullptr);
+    REQUIRE(stmt->tokenLiteral() == "[");
+    auto array = dynamic_pointer_cast<ArrayLiteral>(stmt->expression); 
+    REQUIRE(array != nullptr);
+
+    REQUIRE(array->items.size() == 3);
+    //TODO ... check more internal
+}
+
+
+TEST_CASE("Test Hash Literal", "[parser]"){
+    const char* input = R"STRING( { "one": 1, "two": 2, "three": 3 } )STRING";
+    Lexer lexer{string{input}};
+    Parser parser{lexer};
+    shared_ptr<Program> prog = parser.parseProgram();
+    checkParseError(parser);
+
+    REQUIRE(prog != nullptr);
+    REQUIRE(prog->statements.size() == 1);  
+    auto stmt = std::dynamic_pointer_cast<ExpressionStatement>(prog->statements[0]);
+    REQUIRE(stmt != nullptr);
+    REQUIRE(stmt->tokenLiteral() == "{");
+    auto map = dynamic_pointer_cast<HashLiteral>(stmt->expression); 
+    REQUIRE(map != nullptr);
+
+    REQUIRE(map->entries.size() == 3);
+    //TODO ... check more internal
+
+}
+
+TEST_CASE("Test Index Expression", "[parser]"){
+    Lexer lexer{string{"arr[2 * 3];"}};
+    Parser parser{lexer};
+    shared_ptr<Program> prog = parser.parseProgram();
+    checkParseError(parser);
+
+    REQUIRE(prog != nullptr);
+    REQUIRE(prog->statements.size() == 1);  
+    auto stmt = std::dynamic_pointer_cast<ExpressionStatement>(prog->statements[0]);
+    REQUIRE(stmt != nullptr);
+    REQUIRE(stmt->tokenLiteral() == "arr");
+    auto indexExpr = dynamic_pointer_cast<IndexExpression>(stmt->expression); 
+    REQUIRE(indexExpr != nullptr);
+
+    auto left = dynamic_pointer_cast<Identifier>(indexExpr->left);
+    REQUIRE(left != nullptr);
+    REQUIRE(left->toString() == "arr");
+
+    auto idx = dynamic_pointer_cast<InfixExpression>(indexExpr->index);
+    REQUIRE(idx != nullptr);
 }

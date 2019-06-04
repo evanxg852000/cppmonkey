@@ -116,6 +116,17 @@ public:
     double value;
 };
 
+class StringLiteral: public virtual ExpressionNode {
+public:
+    StringLiteral() = default;
+    StringLiteral(Token token, std::string val): ExpressionNode{token}, value{val} {};
+    virtual ~StringLiteral() = default;
+    virtual void expressionNode();
+    virtual std::string toString();
+
+    std::string value;
+};
+
 class BooleanLiteral: public virtual ExpressionNode {
 public:
     BooleanLiteral() = default;
@@ -126,6 +137,29 @@ public:
     
     bool value;
 };
+
+class ArrayLiteral: public virtual ExpressionNode {
+public:
+    ArrayLiteral() = default;
+    ArrayLiteral(Token token): ExpressionNode{token} {};
+    virtual ~ArrayLiteral() = default;
+    virtual void expressionNode();
+    virtual std::string toString();
+
+    std::vector<std::shared_ptr<ExpressionNode>> items;
+};
+
+class HashLiteral: public virtual ExpressionNode {
+public:
+    HashLiteral() = default;
+    HashLiteral(Token token): ExpressionNode{token} {};
+    virtual ~HashLiteral() = default;
+    virtual void expressionNode();
+    virtual std::string toString();
+
+    std::unordered_map<std::shared_ptr<ExpressionNode>, std::shared_ptr<ExpressionNode>> entries;
+};
+
 
 class PrefixExpression: public virtual ExpressionNode {
 public:
@@ -192,6 +226,20 @@ public:
 
     ExprNode function;
     std::shared_ptr<ExprNodeList> arguments;
+};
+
+class IndexExpression: public virtual ExpressionNode {
+public:
+    using ExprNode = std::shared_ptr<ExpressionNode>;
+
+    IndexExpression() = default;
+    IndexExpression(Token token, ExprNode l): ExpressionNode{token}, left{l} {};
+    virtual ~IndexExpression() = default;
+    virtual void expressionNode();
+    virtual std::string toString();
+
+    std::shared_ptr<ExpressionNode> left;
+    std::shared_ptr<ExpressionNode> index;
 };
 
 #endif // AST_H

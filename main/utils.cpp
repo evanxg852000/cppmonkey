@@ -1,4 +1,5 @@
 #include <cctype>
+#include <iostream>
 
 #include "utils.hpp"
 
@@ -16,4 +17,8 @@ bool isWhitespace(const char& ch){
 
 std::string format() { 
     return ""; 
+}
+
+void _d(std::string str){
+    std::cout << str << std::endl;
 }
